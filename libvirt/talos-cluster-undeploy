@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# 1. Use the EXACT same list of names from your launch script
+NODES=("control-1" "control-2" "control-3" "worker-1" "worker-2" "worker-3")
+NET_NAME="test"
+
+for NODE_NAME in "${NODES[@]}"; do
+    echo "------------------------------------------------------"
+    echo "Cleaning up: $NODE_NAME"
+    
+    # Stop the VM if it's running (ignores errors if already stopped)
+    virsh destroy "$NODE_NAME" 2>/dev/null
+
+    # Delete the VM definition and its associated storage volumes
+    virsh undefine "$NODE_NAME" --remove-all-storage
+
+    # Remove the DHCP reservation from the network
+    # We grep the network XML to find the MAC associated with this name
+    MAC=$(virsh net-dumpxml "$NET_NAME" | grep "name='$NODE_NAME'" | sed -n "s/.*mac='\(.*\)'.*/\1/p")
+    
+    if [ -n "$MAC" ]; then
+        echo "Removing DHCP reservation for MAC: $MAC"
+        virsh net-update "$NET_NAME" delete ip-dhcp-host "<host mac='$MAC'/>" --live --config
+    fi
+done
+
+echo "------------------------------------------------------"
+echo "Cleanup complete. Virtual network '$NET_NAME' is now clean."

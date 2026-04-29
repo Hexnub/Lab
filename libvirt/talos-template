@@ -1,0 +1,9 @@
+virt-install \
+--name talos-template \
+--vcpus 2 \
+--memory 6144 \
+--disk path=/var/lib/libvirt/images/talos-template.qcow2,size=20,bus=virtio \
+--os-variant fedora-coreos-stable \
+--network network=test,model=virtio \
+--boot cdrom,hd \
+--cdrom /var/lib/libvirt/isos/metal-amd64-qemu.iso

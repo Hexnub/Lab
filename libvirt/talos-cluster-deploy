@@ -1,0 +1,47 @@
+#!/bin/bash
+
+NODES=("control-1" "control-2" "control-3" "worker-1" "worker-2" "worker-3")
+
+NET_NAME="test"
+ISO_PATH="/var/lib/libvirt/isos/metal-amd64.iso"
+IMG_DIR="/var/lib/libvirt/images"
+BASE_IP_PREFIX="192.168.122"
+START_IP=50
+
+# Counter for IP and MAC indexing
+i=0
+
+for NODE_NAME in "${NODES[@]}"; do
+  NODE_IP="$BASE_IP_PREFIX.$((START_IP + i))"
+
+  # Generate unique MAC based on index
+  NODE_MAC="52:54:00:12:34:$(printf '%02x' $i)"
+
+  echo "------------------------------------------------------"
+  echo "Deploying: $NODE_NAME"
+  echo "IP:        $NODE_IP"
+  echo "MAC:       $NODE_MAC"
+  echo "------------------------------------------------------"
+
+  # Inject DHCP reservation
+  virsh net-update $NET_NAME add ip-dhcp-host \
+    "<host mac='$NODE_MAC' name='$NODE_NAME' ip='$NODE_IP'/>" \
+    --live --config
+
+  # Launch VM
+  virt-install \
+    --name "$NODE_NAME" \
+    --vcpus 2 \
+    --memory 4096 \
+    --disk path="$IMG_DIR/$NODE_NAME.qcow2",size=20,bus=virtio \
+    --os-variant fedora-coreos-stable \
+    --network network=$NET_NAME,model=virtio,mac=$NODE_MAC \
+    --boot cdrom,hd \
+    --cdrom "$ISO_PATH" \
+    --noautoconsole
+
+  # Increment counter for next IP/MAC
+  ((i++))
+done
+
+echo "Cluster deployment initiated."
